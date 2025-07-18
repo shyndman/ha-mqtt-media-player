@@ -103,6 +103,7 @@ class MQTTMediaPlayer(MediaPlayerEntity):
             "previous_payload": config.get("previous_payload", "Previous"),
             "playmedia_topic": config.get("playmedia_topic"),
             "seek_topic": config.get("seek_topic"),
+            "browse_media_topic": config.get("browse_media_topic"),
         }
 
         # Unsubscribe from subscribed topics
@@ -170,9 +171,6 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         """Return supported features based on available command topics."""
         features = MediaPlayerEntityFeature(0)
         
-        # Always support browse media since it's implemented
-        features |= MediaPlayerEntityFeature.BROWSE_MEDIA
-        
         # Dynamic features based on available command topics
         if self._cmd_topics.get("play_topic"):
             features |= MediaPlayerEntityFeature.PLAY
@@ -206,6 +204,10 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         if self._cmd_topics.get("seek_topic"):
             features |= MediaPlayerEntityFeature.SEEK
             _LOGGER.debug("Added SEEK feature")
+            
+        if self._cmd_topics.get("browse_media_topic"):
+            features |= MediaPlayerEntityFeature.BROWSE_MEDIA
+            _LOGGER.debug("Added BROWSE_MEDIA feature")
             
         _LOGGER.debug("Supported features: %s", features)
         return features
@@ -481,6 +483,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
     async def async_browse_media(self, media_content_type, media_content_id):
         """Implement the websocket media browsing helper."""
+        if not self._cmd_topics.get("browse_media_topic"):
+            _LOGGER.warning("Browse media not available - no browse_media_topic configured")
+            return None
         return await media_source.async_browse_media(
             self.hass,
             media_content_id,

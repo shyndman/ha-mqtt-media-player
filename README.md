@@ -38,6 +38,7 @@ Add the name of your media player, eg: `myplayer`.
 | previous_topic           | Go to previous track                                     | myplayer/previous   | Previous  |
 | playmedia_topic          | Support TTS, playing media, etc...                       | myplayer/playmedia  |           |
 | seek_topic               | Seek to position                                         | myplayer/seek       |           |
+| browse_media_topic       | Enable media browsing functionality                      | myplayer/browse     |           |
 
 
 ## Example MQTT configuration
@@ -71,7 +72,8 @@ A MQTT configuration should be sent to `homeassistant/media_player/myplayer/conf
   "previous_topic": "myplayer/previous",
   "previous_payload": "previous",
   "playmedia_topic": "myplayer/playmedia",
-  "seek_topic": "myplayer/seek"
+  "seek_topic": "myplayer/seek",
+  "browse_media_topic": "myplayer/browse"
 }
 ```
 
@@ -88,7 +90,7 @@ The integration dynamically advertises supported features based on the configure
 - **NEXT_TRACK** - Available when `next_topic` is configured
 - **PREVIOUS_TRACK** - Available when `previous_topic` is configured
 - **PLAY_MEDIA** - Available when `playmedia_topic` is configured
-- **BROWSE_MEDIA** - Always available (built-in functionality)
+- **BROWSE_MEDIA** - Available when `browse_media_topic` is configured
 
 This ensures Home Assistant only shows media controls that are actually functional for your media player.
 
