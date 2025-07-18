@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MQTT Media Player Setup",
+        "description": "Choose how to set up your MQTT Media Player",
+        "data": {
+          "setup_mode": "Setup Mode"
+        }
+      },
+      "discovery": {
+        "title": "Select Device",
+        "description": "Found {device_count} MQTT media player(s). Select one to configure:",
+        "data": {
+          "device": "Device"
+        }
+      },
+      "manual": {
+        "title": "Manual Configuration",
+        "description": "Enter the device name (used in MQTT topics)",
+        "data": {
+          "name": "Device Name"
+        }
+      },
+      "discovered_device": {
+        "title": "Confirm Device",
+        "description": "Set up MQTT Media Player for {device_name}?"
+      }
+    },
+    "error": {
+      "invalid_device_name": "Device name must contain only letters, numbers, underscores, and hyphens",
+      "device_not_found": "No MQTT configuration found for this device",
+      "discovery_failed": "Failed to discover devices. Please try manual configuration.",
+      "discovery_error": "Error during device discovery",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "discovery_error": "Error during device discovery"
+    }
+  }
+}
