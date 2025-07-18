@@ -3,9 +3,11 @@ import hashlib
 import json
 import logging
 
+
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
+    async_fetch_image,
 )
 from homeassistant.components.media_player.browse_media import (
     async_process_play_media_url,
@@ -52,6 +54,7 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         self._media_artist = None
         self._media_album = None
         self._album_art = None
+        self._album_art_url = None
         self._duration = None
         self._position = None
         self._available = None
@@ -224,16 +227,58 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         return self._duration
 
     @property
+    def media_image_url(self):
+        """URL for media image."""
+        if self._album_art_url:
+            _LOGGER.debug("Returning media image URL: %s", self._album_art_url)
+            return self._album_art_url
+        _LOGGER.debug("No media image URL available")
+        return None
+
+    @property
+    def media_image_remotely_accessible(self):
+        """Return True if media image is accessible from outside the local network."""
+        # Base64 images are handled locally and don't need proxying
+        # URLs from local network (like local media servers) need proxying
+        if self._album_art is not None:
+            _LOGGER.debug("Media image is base64 data, remotely accessible: True")
+            return True  # Base64 data is always accessible
+        _LOGGER.debug("Media image is URL, remotely accessible: False (needs proxying)")
+        return False  # URLs might not be accessible remotely, so proxy them
+
+    @property
     def media_image_hash(self):
         """Hash value for media image."""
         if self._album_art:
-            return hashlib.md5(self._album_art).hexdigest()[:5]
+            hash_value = hashlib.md5(self._album_art).hexdigest()[:5]
+            _LOGGER.debug("Generated hash for base64 image: %s", hash_value)
+            return hash_value
+        elif self._album_art_url:
+            hash_value = hashlib.md5(self._album_art_url.encode()).hexdigest()[:5]
+            _LOGGER.debug("Generated hash for URL image: %s", hash_value)
+            return hash_value
+        _LOGGER.debug("No media image available for hash generation")
         return None
 
     async def async_get_media_image(self):
         """Fetch media image of current playing image."""
+        _LOGGER.debug("async_get_media_image called")
         if self._album_art:
+            _LOGGER.debug("Returning base64 image data (%d bytes)", len(self._album_art))
             return (self._album_art, "image/jpeg")
+        elif self._album_art_url:
+            # Use Home Assistant's built-in image fetching for URL-based images
+            _LOGGER.debug("Fetching image from URL: %s", self._album_art_url)
+            try:
+                result = await async_fetch_image(_LOGGER, self._hass, self._album_art_url)
+                if result[0]:
+                    _LOGGER.debug("Successfully fetched image from URL (%d bytes, %s)", len(result[0]), result[1])
+                else:
+                    _LOGGER.debug("No image data returned from URL")
+                return result
+            except Exception as e:
+                _LOGGER.warning("Failed to fetch album art from URL %s: %s", self._album_art_url, e)
+        _LOGGER.debug("No media image available")
         return None, None
 
     async def handle_availability(self, message):
@@ -289,7 +334,24 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
     async def handle_albumart(self, message):
         """Update the album art based on the MQTT album art topic."""
-        self._album_art = base64.b64decode(message.payload.replace("\n", ""))
+        payload = message.payload.strip()
+        
+        # Check if payload is a URL (starts with http:// or https://)
+        if payload.startswith(('http://', 'https://')):
+            _LOGGER.debug("Album art payload is URL: %s", payload)
+            self._album_art_url = payload
+            self._album_art = None
+        else:
+            # Assume it's base64 encoded data
+            _LOGGER.debug("Album art payload is base64 data")
+            try:
+                self._album_art = base64.b64decode(payload.replace("\n", ""))
+                self._album_art_url = None
+            except Exception as e:
+                _LOGGER.warning("Failed to decode base64 album art: %s", e)
+                self._album_art = None
+                self._album_art_url = None
+        
         self.async_write_ha_state()
 
     async def handle_mediatype(self, message):
