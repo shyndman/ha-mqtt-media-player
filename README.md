@@ -16,60 +16,59 @@ Add the name of your media player, eg: `myplayer`.
 
 | Variables                | Description                                              | Topic               | Payload   |
 |--------------------------|----------------------------------------------------------|---------------------|-----------|
-| availability             | Availability                                             |                     |           |
-|   topic                  | Availability topic                                       | myplayer/available  |           |
+| availability_topic       | Availability topic                                       | myplayer/available  |           |
+| availability             | Availability payloads                                    |                     |           |
 |   payload_available      | Availability payload when available                      |                     | online    |
-|   payload_unavailable    | Availability payload when unavailable                    |                     | offline   |
+|   payload_not_available  | Availability payload when unavailable                    |                     | offline   |
 | name                     | The name of the Media Player                             |                     | MyPlayer  |
-| state_state_topic        | Media Player state (off, idle, paused, stopped, playing) | myplayer/state      |           |
-| state_title_topic        | Track Title                                              | myplayer/title      |           |
-| state_artist_topic       | Track Artist                                             | myplayer/artist     |           |
-| state_album_topic        | Track Album                                              | myplayer/album      |           |
-| state_duration_topic     | Track Duration (int)                                     | myplayer/duration   |           |
-| state_position_topic     | Track Position (int)                                     | myplayer/position   |           |
-| state_albumart_topic     | Album Art (base64 or URL)                               | myplayer/albumart   |           |
-| state_mediatype_topic    | Media Type (music, video)                                | myplayer/mediatype  |           |
-| state_volume_topic       | Current system volume                                    | myplayer/volume     |           |
-| command_volume_topic     | Set System volume                                        | myplayer/volumeset  |           |
-| command_play_topic       | Play media                                               | myplayer/play       | Play      |
-| command_pause_topic      | Pause media                                              | myplayer/pause      | Pause     |
-| *command_playpause_topic | PlayPause media                                          | myplayer/playpause  | PlayPause |
-| command_next_topic       | Go to next track                                         | myplayer/next       | Next      |
-| command_previous_topic   | Go to previous track                                     | myplayer/previous   | Previous  |
-| command_playmedia_topic  | Support TTS, playing media, etc...                       | myplayer/playmedia  |           |
+| state_topic              | Media Player state (off, idle, paused, stopped, playing) | myplayer/state      |           |
+| title_topic              | Track Title                                              | myplayer/title      |           |
+| artist_topic             | Track Artist                                             | myplayer/artist     |           |
+| album_topic              | Track Album                                              | myplayer/album      |           |
+| duration_topic           | Track Duration (int)                                     | myplayer/duration   |           |
+| position_topic           | Track Position (int)                                     | myplayer/position   |           |
+| albumart_topic           | Album Art (base64 or URL)                               | myplayer/albumart   |           |
+| mediatype_topic          | Media Type (music, video)                                | myplayer/mediatype  |           |
+| volume_topic             | Current system volume                                    | myplayer/volume     |           |
+| volumeset_topic          | Set System volume                                        | myplayer/volumeset  |           |
+| play_topic               | Play media                                               | myplayer/play       | Play      |
+| pause_topic              | Pause media                                              | myplayer/pause      | Pause     |
+| next_topic               | Go to next track                                         | myplayer/next       | Next      |
+| previous_topic           | Go to previous track                                     | myplayer/previous   | Previous  |
+| playmedia_topic          | Support TTS, playing media, etc...                       | myplayer/playmedia  |           |
+| seek_topic               | Seek to position                                         | myplayer/seek       |           |
 
 
 ## Example MQTT configuration
 A MQTT configuration should be sent to `homeassistant/media_player/myplayer/config`.
 ```json
 {
+  "availability_topic": "myplayer/available",
   "availability": {
-    "topic": "myplayer/available",
     "payload_available": "ON",
     "payload_not_available": "OFF"
   },
   "name": "My Custom Player",
-  "state_state_topic": "myplayer/state",
-  "state_title_topic": "myplayer/title",
-  "state_artist_topic": "myplayer/artist",
-  "state_album_topic": "myplayer/album",
-  "state_duration_topic": "myplayer/duration",
-  "state_position_topic": "myplayer/position",
-  "state_volume_topic": "myplayer/volume",
-  "state_albumart_topic": "myplayer/albumart",
-  "state_mediatype_topic": "myplayer/mediatype",
-  "command_volume_topic": "myplayer/set_volume",
-  "command_play_topic": "myplayer/play",
-  "command_play_payload": "play",
-  "command_pause_topic": "myplayer/pause",
-  "command_pause_payload": "pause",
-  "command_playpause_topic": "myplayer/playpause",
-  "command_playpause_payload": "playpause",
-  "command_next_topic": "myplayer/next",
-  "command_next_payload": "next",
-  "command_previous_topic": "myplayer/previous",
-  "command_previous_payload": "previous",
-  "command_playmedia_topic": "myplayer/playmedia"
+  "state_topic": "myplayer/state",
+  "title_topic": "myplayer/title",
+  "artist_topic": "myplayer/artist",
+  "album_topic": "myplayer/album",
+  "duration_topic": "myplayer/duration",
+  "position_topic": "myplayer/position",
+  "volume_topic": "myplayer/volume",
+  "albumart_topic": "myplayer/albumart",
+  "mediatype_topic": "myplayer/mediatype",
+  "volumeset_topic": "myplayer/set_volume",
+  "play_topic": "myplayer/play",
+  "play_payload": "play",
+  "pause_topic": "myplayer/pause",
+  "pause_payload": "pause",
+  "next_topic": "myplayer/next",
+  "next_payload": "next",
+  "previous_topic": "myplayer/previous",
+  "previous_payload": "previous",
+  "playmedia_topic": "myplayer/playmedia",
+  "seek_topic": "myplayer/seek"
 }
 ```
 

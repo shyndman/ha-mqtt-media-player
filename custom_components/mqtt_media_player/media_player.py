@@ -70,7 +70,7 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
         # Set the MQTT topics from the configuration
         self._availability_topics = {
-            "availability_topic": config.get("availability", {}).get("topic"),
+            "availability_topic": config.get("availability_topic"),
             "available": config.get("availability", {}).get(
                 "payload_available", "online"
             ),
@@ -79,27 +79,28 @@ class MQTTMediaPlayer(MediaPlayerEntity):
             ),
         }
         self._state_topics = {
-            "state_topic": config.get("state_state_topic"),
-            "title_topic": config.get("state_title_topic"),
-            "artist_topic": config.get("state_artist_topic"),
-            "album_topic": config.get("state_album_topic"),
-            "duration_topic": config.get("state_duration_topic"),
-            "position_topic": config.get("state_position_topic"),
-            "volume_topic": config.get("state_volume_topic"),
-            "albumart_topic": config.get("state_albumart_topic"),
-            "mediatype_topic": config.get("state_mediatype_topic"),
+            "state_topic": config.get("state_topic"),
+            "title_topic": config.get("title_topic"),
+            "artist_topic": config.get("artist_topic"),
+            "album_topic": config.get("album_topic"),
+            "duration_topic": config.get("duration_topic"),
+            "position_topic": config.get("position_topic"),
+            "volume_topic": config.get("volume_topic"),
+            "albumart_topic": config.get("albumart_topic"),
+            "mediatype_topic": config.get("mediatype_topic"),
         }
         self._cmd_topics = {
-            "volumeset_topic": config.get("command_volume_topic"),
-            "play_topic": config.get("command_play_topic"),
-            "play_payload": config.get("command_play_payload", "Play"),
-            "pause_topic": config.get("command_pause_topic"),
-            "pause_payload": config.get("command_pause_payload", "Pause"),
-            "next_topic": config.get("command_next_topic"),
-            "next_payload": config.get("command_next_payload", "Next"),
-            "previous_topic": config.get("command_previous_topic"),
-            "previous_payload": config.get("command_previous_payload", "Previous"),
-            "playmedia_topic": config.get("command_playmedia_topic"),
+            "volumeset_topic": config.get("volumeset_topic"),
+            "play_topic": config.get("play_topic"),
+            "play_payload": config.get("play_payload", "Play"),
+            "pause_topic": config.get("pause_topic"),
+            "pause_payload": config.get("pause_payload", "Pause"),
+            "next_topic": config.get("next_topic"),
+            "next_payload": config.get("next_payload", "Next"),
+            "previous_topic": config.get("previous_topic"),
+            "previous_payload": config.get("previous_payload", "Previous"),
+            "playmedia_topic": config.get("playmedia_topic"),
+            "seek_topic": config.get("seek_topic"),
         }
 
         # Unsubscribe from subscribed topics
