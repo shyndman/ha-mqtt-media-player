@@ -27,7 +27,7 @@ Add the name of your media player, eg: `myplayer`.
 | state_album_topic        | Track Album                                              | myplayer/album      |           |
 | state_duration_topic     | Track Duration (int)                                     | myplayer/duration   |           |
 | state_position_topic     | Track Position (int)                                     | myplayer/position   |           |
-| state_albumart_topic     | Thumbnail (byte)                                         | myplayer/albumart   |           |
+| state_albumart_topic     | Album Art (base64 or URL)                               | myplayer/albumart   |           |
 | state_mediatype_topic    | Media Type (music, video)                                | myplayer/mediatype  |           |
 | state_volume_topic       | Current system volume                                    | myplayer/volume     |           |
 | command_volume_topic     | Set System volume                                        | myplayer/volumeset  |           |
@@ -71,4 +71,42 @@ A MQTT configuration should be sent to `homeassistant/media_player/myplayer/conf
   "command_previous_payload": "previous",
   "command_playmedia_topic": "myplayer/playmedia"
 }
+```
+
+## Features
+
+### Album Art Support
+The integration supports two formats for album art via the `state_albumart_topic`:
+
+1. **Base64 encoded images**: Send base64 encoded image data directly
+2. **Image URLs**: Send HTTP/HTTPS URLs to images (e.g., `https://example.com/albumart.jpg`)
+
+The integration automatically detects the format and handles image proxying through Home Assistant for remote access when needed.
+
+**Example album art payloads:**
+```bash
+# Base64 encoded image (existing format)
+mosquitto_pub -t "myplayer/albumart" -m "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+
+# Image URL (new format)
+mosquitto_pub -t "myplayer/albumart" -m "https://example.com/album-cover.jpg"
+```
+
+### Debug Logging
+Comprehensive debug logging is available throughout the integration. Set your Home Assistant logging level to `debug` for the component to see detailed information about:
+
+- Integration setup process
+- MQTT topic subscriptions  
+- Configuration handling
+- Album art processing (base64 vs URL)
+- Image fetching and proxying
+
+To enable debug logging, add this to your `configuration.yaml`:
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.mqtt_media_player: debug
+```
 ```

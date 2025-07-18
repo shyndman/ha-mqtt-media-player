@@ -5,6 +5,5 @@
   "requirements": [],
   "config_flow": true,
   "dependencies": ["mqtt"],
-  "codeowners": ["@bkbilly"]
+  "codeowners": ["@shyndman"]
 }
-
