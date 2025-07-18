@@ -33,6 +33,7 @@ Add the name of your media player, eg: `myplayer`.
 | volumeset_topic          | Set System volume                                        | myplayer/volumeset  |           |
 | play_topic               | Play media                                               | myplayer/play       | Play      |
 | pause_topic              | Pause media                                              | myplayer/pause      | Pause     |
+| stop_topic               | Stop media                                               | myplayer/stop       | Stop      |
 | next_topic               | Go to next track                                         | myplayer/next       | Next      |
 | previous_topic           | Go to previous track                                     | myplayer/previous   | Previous  |
 | playmedia_topic          | Support TTS, playing media, etc...                       | myplayer/playmedia  |           |
@@ -63,6 +64,8 @@ A MQTT configuration should be sent to `homeassistant/media_player/myplayer/conf
   "play_payload": "play",
   "pause_topic": "myplayer/pause",
   "pause_payload": "pause",
+  "stop_topic": "myplayer/stop",
+  "stop_payload": "stop",
   "next_topic": "myplayer/next",
   "next_payload": "next",
   "previous_topic": "myplayer/previous",
@@ -73,6 +76,21 @@ A MQTT configuration should be sent to `homeassistant/media_player/myplayer/conf
 ```
 
 ## Features
+
+### Dynamic Feature Support
+The integration dynamically advertises supported features based on the configured command topics:
+
+- **PLAY** - Available when `play_topic` is configured
+- **PAUSE** - Available when `pause_topic` is configured  
+- **STOP** - Available when `stop_topic` is configured
+- **SEEK** - Available when `seek_topic` is configured
+- **VOLUME_SET/VOLUME_STEP** - Available when `volumeset_topic` is configured
+- **NEXT_TRACK** - Available when `next_topic` is configured
+- **PREVIOUS_TRACK** - Available when `previous_topic` is configured
+- **PLAY_MEDIA** - Available when `playmedia_topic` is configured
+- **BROWSE_MEDIA** - Always available (built-in functionality)
+
+This ensures Home Assistant only shows media controls that are actually functional for your media player.
 
 ### Album Art Support
 The integration supports two formats for album art via the `state_albumart_topic`:

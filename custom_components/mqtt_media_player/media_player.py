@@ -95,6 +95,8 @@ class MQTTMediaPlayer(MediaPlayerEntity):
             "play_payload": config.get("play_payload", "Play"),
             "pause_topic": config.get("pause_topic"),
             "pause_payload": config.get("pause_payload", "Pause"),
+            "stop_topic": config.get("stop_topic"),
+            "stop_payload": config.get("stop_payload", "Stop"),
             "next_topic": config.get("next_topic"),
             "next_payload": config.get("next_payload", "Next"),
             "previous_topic": config.get("previous_topic"),
@@ -165,18 +167,48 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
     @property
     def supported_features(self):
-        """Return supported features."""
-        return (
-            MediaPlayerEntityFeature.PLAY
-            | MediaPlayerEntityFeature.PAUSE
-            | MediaPlayerEntityFeature.STOP
-            | MediaPlayerEntityFeature.VOLUME_SET
-            | MediaPlayerEntityFeature.VOLUME_STEP
-            | MediaPlayerEntityFeature.NEXT_TRACK
-            | MediaPlayerEntityFeature.PREVIOUS_TRACK
-            | MediaPlayerEntityFeature.PLAY_MEDIA
-            | MediaPlayerEntityFeature.BROWSE_MEDIA
-        )
+        """Return supported features based on available command topics."""
+        features = MediaPlayerEntityFeature(0)
+        
+        # Always support browse media since it's implemented
+        features |= MediaPlayerEntityFeature.BROWSE_MEDIA
+        
+        # Dynamic features based on available command topics
+        if self._cmd_topics.get("play_topic"):
+            features |= MediaPlayerEntityFeature.PLAY
+            _LOGGER.debug("Added PLAY feature")
+            
+        if self._cmd_topics.get("pause_topic"):
+            features |= MediaPlayerEntityFeature.PAUSE
+            _LOGGER.debug("Added PAUSE feature")
+            
+        if self._cmd_topics.get("stop_topic"):
+            features |= MediaPlayerEntityFeature.STOP
+            _LOGGER.debug("Added STOP feature")
+            
+        if self._cmd_topics.get("volumeset_topic"):
+            features |= MediaPlayerEntityFeature.VOLUME_SET
+            features |= MediaPlayerEntityFeature.VOLUME_STEP
+            _LOGGER.debug("Added VOLUME_SET and VOLUME_STEP features")
+            
+        if self._cmd_topics.get("next_topic"):
+            features |= MediaPlayerEntityFeature.NEXT_TRACK
+            _LOGGER.debug("Added NEXT_TRACK feature")
+            
+        if self._cmd_topics.get("previous_topic"):
+            features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
+            _LOGGER.debug("Added PREVIOUS_TRACK feature")
+            
+        if self._cmd_topics.get("playmedia_topic"):
+            features |= MediaPlayerEntityFeature.PLAY_MEDIA
+            _LOGGER.debug("Added PLAY_MEDIA feature")
+            
+        if self._cmd_topics.get("seek_topic"):
+            features |= MediaPlayerEntityFeature.SEEK
+            _LOGGER.debug("Added SEEK feature")
+            
+        _LOGGER.debug("Supported features: %s", features)
+        return features
 
     @property
     def should_poll(self):
@@ -362,26 +394,49 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
     async def async_media_play(self):
         """Send play command via MQTT."""
+        if not self._cmd_topics.get("play_topic"):
+            _LOGGER.warning("Play command not available - no play_topic configured")
+            return
         await async_publish(
             self._hass, self._cmd_topics["play_topic"], self._cmd_topics["play_payload"]
         )
 
     async def async_media_pause(self):
         """Send pause command via MQTT."""
+        if not self._cmd_topics.get("pause_topic"):
+            _LOGGER.warning("Pause command not available - no pause_topic configured")
+            return
         await async_publish(
             self._hass,
             self._cmd_topics["pause_topic"],
             self._cmd_topics["pause_payload"],
         )
 
+    async def async_media_stop(self):
+        """Send stop command via MQTT."""
+        if not self._cmd_topics.get("stop_topic"):
+            _LOGGER.warning("Stop command not available - no stop_topic configured")
+            return
+        await async_publish(
+            self._hass,
+            self._cmd_topics["stop_topic"],
+            self._cmd_topics["stop_payload"],
+        )
+
     async def async_media_next_track(self):
         """Send next track command via MQTT."""
+        if not self._cmd_topics.get("next_topic"):
+            _LOGGER.warning("Next track command not available - no next_topic configured")
+            return
         await async_publish(
             self._hass, self._cmd_topics["next_topic"], self._cmd_topics["next_payload"]
         )
 
     async def async_media_previous_track(self):
         """Send previous track command via MQTT."""
+        if not self._cmd_topics.get("previous_topic"):
+            _LOGGER.warning("Previous track command not available - no previous_topic configured")
+            return
         await async_publish(
             self._hass,
             self._cmd_topics["previous_topic"],
@@ -390,13 +445,28 @@ class MQTTMediaPlayer(MediaPlayerEntity):
 
     async def async_set_volume_level(self, volume):
         """Set the volume level via MQTT."""
+        if not self._cmd_topics.get("volumeset_topic"):
+            _LOGGER.warning("Volume set command not available - no volumeset_topic configured")
+            return
         self._volume = round(float(volume), 2)
         await async_publish(
             self._hass, self._cmd_topics["volumeset_topic"], self._volume
         )
 
+    async def async_media_seek(self, position):
+        """Send seek command via MQTT."""
+        if not self._cmd_topics.get("seek_topic"):
+            _LOGGER.warning("Seek command not available - no seek_topic configured")
+            return
+        await async_publish(
+            self._hass, self._cmd_topics["seek_topic"], position
+        )
+
     async def async_play_media(self, media_type, media_id, **kwargs):
         """Sends media to play."""
+        if not self._cmd_topics.get("playmedia_topic"):
+            _LOGGER.warning("Play media command not available - no playmedia_topic configured")
+            return
         if media_source.is_media_source_id(media_id):
             sourced_media = await media_source.async_resolve_media(self.hass, media_id)
             media_type = sourced_media.mime_type
