@@ -7,10 +7,12 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER]
 
+
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the integration using YAML (if needed)."""
     _LOGGER.debug("async_setup called with config: %s", config)
     return True  # Allow UI-only configuration
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the integration from the UI."""
@@ -21,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     )
     _LOGGER.debug("Successfully set up platforms: %s", PLATFORMS)
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Handle removal of the integration."""

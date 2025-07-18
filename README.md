@@ -21,6 +21,7 @@ Add the name of your media player, eg: `myplayer`.
 |   payload_available      | Availability payload when available                      |                     | online    |
 |   payload_not_available  | Availability payload when unavailable                    |                     | offline   |
 | name                     | The name of the Media Player                             |                     | MyPlayer  |
+| device                   | Device information (optional)                            |                     |           |
 | state_topic              | Media Player state (off, idle, paused, stopped, playing) | myplayer/state      |           |
 | title_topic              | Track Title                                              | myplayer/title      |           |
 | artist_topic             | Track Artist                                             | myplayer/artist     |           |
@@ -51,6 +52,13 @@ A MQTT configuration should be sent to `homeassistant/media_player/myplayer/conf
     "payload_not_available": "OFF"
   },
   "name": "My Custom Player",
+  "device": {
+    "identifiers": ["webos_youtube_app"],
+    "name": "webOS YouTube App",
+    "model": "YouTube TV App",
+    "manufacturer": "webOS",
+    "sw_version": "0.3.8"
+  },
   "state_topic": "myplayer/state",
   "title_topic": "myplayer/title",
   "artist_topic": "myplayer/artist",

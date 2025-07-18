@@ -39,6 +39,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class MQTTMediaPlayer(MediaPlayerEntity):
     """Representation of a MQTT Media Player."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, hass, config_entry):
         """Initialize the MQTT Media Player."""
         _LOGGER.debug(
@@ -46,7 +48,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         )
         self._hass = hass
         self._config_entry = config_entry
-        self._name = None
+        self._name = (
+            None  # Will be set from config or fallback to None for main device feature
+        )
         # self._domain = __name__.split(".")[-2]
         self._state = None
         self._volume = 0.0
@@ -60,13 +64,48 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         self._available = None
         self._media_type = "music"
         self._subscribed = []
+
+        # Initialize unique ID and device info
+        self._unique_id = self._config_entry.title  # Use the name provided by user
+        self._device_info = {
+            "identifiers": {("mqtt_media_player", self._unique_id)},
+            "name": self._config_entry.title,
+            "manufacturer": "MQTT Media Player",
+            "model": "MQTT Media Player",
+            "sw_version": "1.0.0",
+        }
+
         _LOGGER.debug("MQTT Media Player initialized with default values")
 
     async def handle_config(self, message):
         """Handle incoming configuration from MQTT."""
         config = json.loads(message.payload)
         _LOGGER.info(f"Received configuration: {config}")
-        self._name = config.get("name")
+
+        # Set entity name - None for main device feature, or specific name if provided
+        self._name = (
+            config.get("name")
+            if config.get("name") != self._config_entry.title
+            else None
+        )
+        _LOGGER.debug("Entity name set to: %s", self._name)
+
+        # Update device info if device details are provided in config
+        if "device" in config:
+            device_config = config["device"]
+            # Use device identifiers if provided, otherwise use unique_id
+            device_identifiers = device_config.get("identifiers", [self._unique_id])
+            self._device_info = {
+                "identifiers": {
+                    ("mqtt_media_player", identifier)
+                    for identifier in device_identifiers
+                },
+                "name": self._config_entry.title,
+                "manufacturer": device_config.get("manufacturer", "MQTT Media Player"),
+                "model": device_config.get("model", "MQTT Media Player"),
+                "sw_version": device_config.get("sw_version", "1.0.0"),
+            }
+            _LOGGER.debug("Updated device info: %s", self._device_info)
 
         # Set the MQTT topics from the configuration
         self._availability_topics = {
@@ -170,45 +209,45 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     def supported_features(self):
         """Return supported features based on available command topics."""
         features = MediaPlayerEntityFeature(0)
-        
+
         # Dynamic features based on available command topics
         if self._cmd_topics.get("play_topic"):
             features |= MediaPlayerEntityFeature.PLAY
             _LOGGER.debug("Added PLAY feature")
-            
+
         if self._cmd_topics.get("pause_topic"):
             features |= MediaPlayerEntityFeature.PAUSE
             _LOGGER.debug("Added PAUSE feature")
-            
+
         if self._cmd_topics.get("stop_topic"):
             features |= MediaPlayerEntityFeature.STOP
             _LOGGER.debug("Added STOP feature")
-            
+
         if self._cmd_topics.get("volumeset_topic"):
             features |= MediaPlayerEntityFeature.VOLUME_SET
             features |= MediaPlayerEntityFeature.VOLUME_STEP
             _LOGGER.debug("Added VOLUME_SET and VOLUME_STEP features")
-            
+
         if self._cmd_topics.get("next_topic"):
             features |= MediaPlayerEntityFeature.NEXT_TRACK
             _LOGGER.debug("Added NEXT_TRACK feature")
-            
+
         if self._cmd_topics.get("previous_topic"):
             features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
             _LOGGER.debug("Added PREVIOUS_TRACK feature")
-            
+
         if self._cmd_topics.get("playmedia_topic"):
             features |= MediaPlayerEntityFeature.PLAY_MEDIA
             _LOGGER.debug("Added PLAY_MEDIA feature")
-            
+
         if self._cmd_topics.get("seek_topic"):
             features |= MediaPlayerEntityFeature.SEEK
             _LOGGER.debug("Added SEEK feature")
-            
+
         if self._cmd_topics.get("browse_media_topic"):
             features |= MediaPlayerEntityFeature.BROWSE_MEDIA
             _LOGGER.debug("Added BROWSE_MEDIA feature")
-            
+
         _LOGGER.debug("Supported features: %s", features)
         return features
 
@@ -221,8 +260,13 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         return self._name
 
     @property
+    def device_info(self):
+        """Return device info."""
+        return self._device_info
+
+    @property
     def unique_id(self):
-        return self._config_entry.title
+        return self._unique_id
 
     @property
     def state(self):
@@ -299,20 +343,30 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         """Fetch media image of current playing image."""
         _LOGGER.debug("async_get_media_image called")
         if self._album_art:
-            _LOGGER.debug("Returning base64 image data (%d bytes)", len(self._album_art))
+            _LOGGER.debug(
+                "Returning base64 image data (%d bytes)", len(self._album_art)
+            )
             return (self._album_art, "image/jpeg")
         elif self._album_art_url:
             # Use Home Assistant's built-in image fetching for URL-based images
             _LOGGER.debug("Fetching image from URL: %s", self._album_art_url)
             try:
-                result = await async_fetch_image(_LOGGER, self._hass, self._album_art_url)
+                result = await async_fetch_image(
+                    _LOGGER, self._hass, self._album_art_url
+                )
                 if result[0]:
-                    _LOGGER.debug("Successfully fetched image from URL (%d bytes, %s)", len(result[0]), result[1])
+                    _LOGGER.debug(
+                        "Successfully fetched image from URL (%d bytes, %s)",
+                        len(result[0]),
+                        result[1],
+                    )
                 else:
                     _LOGGER.debug("No image data returned from URL")
                 return result
             except Exception as e:
-                _LOGGER.warning("Failed to fetch album art from URL %s: %s", self._album_art_url, e)
+                _LOGGER.warning(
+                    "Failed to fetch album art from URL %s: %s", self._album_art_url, e
+                )
         _LOGGER.debug("No media image available")
         return None, None
 
@@ -370,9 +424,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     async def handle_albumart(self, message):
         """Update the album art based on the MQTT album art topic."""
         payload = message.payload.strip()
-        
+
         # Check if payload is a URL (starts with http:// or https://)
-        if payload.startswith(('http://', 'https://')):
+        if payload.startswith(("http://", "https://")):
             _LOGGER.debug("Album art payload is URL: %s", payload)
             self._album_art_url = payload
             self._album_art = None
@@ -386,7 +440,7 @@ class MQTTMediaPlayer(MediaPlayerEntity):
                 _LOGGER.warning("Failed to decode base64 album art: %s", e)
                 self._album_art = None
                 self._album_art_url = None
-        
+
         self.async_write_ha_state()
 
     async def handle_mediatype(self, message):
@@ -428,7 +482,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     async def async_media_next_track(self):
         """Send next track command via MQTT."""
         if not self._cmd_topics.get("next_topic"):
-            _LOGGER.warning("Next track command not available - no next_topic configured")
+            _LOGGER.warning(
+                "Next track command not available - no next_topic configured"
+            )
             return
         await async_publish(
             self._hass, self._cmd_topics["next_topic"], self._cmd_topics["next_payload"]
@@ -437,7 +493,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     async def async_media_previous_track(self):
         """Send previous track command via MQTT."""
         if not self._cmd_topics.get("previous_topic"):
-            _LOGGER.warning("Previous track command not available - no previous_topic configured")
+            _LOGGER.warning(
+                "Previous track command not available - no previous_topic configured"
+            )
             return
         await async_publish(
             self._hass,
@@ -448,7 +506,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     async def async_set_volume_level(self, volume):
         """Set the volume level via MQTT."""
         if not self._cmd_topics.get("volumeset_topic"):
-            _LOGGER.warning("Volume set command not available - no volumeset_topic configured")
+            _LOGGER.warning(
+                "Volume set command not available - no volumeset_topic configured"
+            )
             return
         self._volume = round(float(volume), 2)
         await async_publish(
@@ -460,14 +520,14 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         if not self._cmd_topics.get("seek_topic"):
             _LOGGER.warning("Seek command not available - no seek_topic configured")
             return
-        await async_publish(
-            self._hass, self._cmd_topics["seek_topic"], position
-        )
+        await async_publish(self._hass, self._cmd_topics["seek_topic"], position)
 
     async def async_play_media(self, media_type, media_id, **kwargs):
         """Sends media to play."""
         if not self._cmd_topics.get("playmedia_topic"):
-            _LOGGER.warning("Play media command not available - no playmedia_topic configured")
+            _LOGGER.warning(
+                "Play media command not available - no playmedia_topic configured"
+            )
             return
         if media_source.is_media_source_id(media_id):
             sourced_media = await media_source.async_resolve_media(self.hass, media_id)
@@ -484,7 +544,9 @@ class MQTTMediaPlayer(MediaPlayerEntity):
     async def async_browse_media(self, media_content_type, media_content_id):
         """Implement the websocket media browsing helper."""
         if not self._cmd_topics.get("browse_media_topic"):
-            _LOGGER.warning("Browse media not available - no browse_media_topic configured")
+            _LOGGER.warning(
+                "Browse media not available - no browse_media_topic configured"
+            )
             return None
         return await media_source.async_browse_media(
             self.hass,
