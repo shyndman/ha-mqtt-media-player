@@ -64,6 +64,11 @@ class MQTTMediaPlayer(MediaPlayerEntity):
         self._available = None
         self._media_type = "music"
         self._subscribed = []
+        
+        # Initialize empty topic dictionaries - will be populated when config is received
+        self._cmd_topics = {}
+        self._state_topics = {}
+        self._availability_topics = {}
 
         # Initialize unique ID and device info
         self._unique_id = self._config_entry.title  # Use the name provided by user
