@@ -1,5 +1,6 @@
 """MQTT Media Player Data Update Coordinator."""
 import logging
+import math
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -123,9 +124,10 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
     def _handle_duration(self, message):
         """Handle duration updates."""
         try:
-            duration = int(message.payload)
-            _LOGGER.debug("Duration update: %s", duration)
-            self.data["duration"] = duration
+            duration = float(message.payload)
+            duration_int = math.ceil(duration)
+            _LOGGER.debug("Duration update: %s (rounded from %s)", duration_int, duration)
+            self.data["duration"] = duration_int
         except (ValueError, TypeError):
             _LOGGER.warning("Invalid duration value: %s", message.payload)
             self.data["duration"] = None
@@ -135,9 +137,10 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
     def _handle_position(self, message):
         """Handle position updates."""
         try:
-            position = int(message.payload)
-            _LOGGER.debug("Position update: %s", position)
-            self.data["position"] = position
+            position = float(message.payload)
+            position_int = math.ceil(position)
+            _LOGGER.debug("Position update: %s (rounded from %s)", position_int, position)
+            self.data["position"] = position_int
         except (ValueError, TypeError):
             _LOGGER.warning("Invalid position value: %s", message.payload)
             self.data["position"] = None
