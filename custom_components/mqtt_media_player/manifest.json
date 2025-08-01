@@ -1,7 +1,7 @@
 {
   "domain": "mqtt_media_player",
   "name": "MQTT Media Player",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "requirements": [],
   "config_flow": true,
   "dependencies": ["mqtt"],

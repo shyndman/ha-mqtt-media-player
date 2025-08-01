@@ -1,29 +1,27 @@
-"""MQTT Media Player entity implementation."""
+"""MQTT Media Player entity implementation v2.0 - ha-mqtt-discoverable spec compliant."""
+
 import hashlib
-import json
 import logging
 from typing import Any
 
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
+    MediaPlayerEntityFeature,
+    MediaPlayerState,
+    RepeatMode,
     async_fetch_image,
 )
-from homeassistant.components.media_player.browse_media import (
-    async_process_play_media_url,
-)
-from homeassistant.components.media_player.const import MediaPlayerEntityFeature
 from homeassistant.components.mqtt import async_publish
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.util.dt import utcnow
 
-from .const import DOMAIN
-
-# Import coordinator for runtime use
+from .const import (
+    DOMAIN,
+)
 from .coordinator import MQTTMediaPlayerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,12 +45,14 @@ async def async_setup_entry(
 
 
 class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
-    """MQTT Media Player entity using coordinator."""
+    """MQTT Media Player entity using coordinator and v2.0 spec."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, coordinator: MQTTMediaPlayerCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(
+        self, coordinator: MQTTMediaPlayerCoordinator, config_entry: ConfigEntry
+    ) -> None:
         """Initialize the MQTT Media Player."""
         super().__init__(coordinator)
 
@@ -61,7 +61,11 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
 
         # Set up entity attributes from config
         self._attr_unique_id = self._mqtt_config.get("unique_id", config_entry.title)
-        self._attr_name = self._mqtt_config.get("name") if self._mqtt_config.get("name") != config_entry.title else None
+        self._attr_name = (
+            self._mqtt_config.get("name")
+            if self._mqtt_config.get("name") != config_entry.title
+            else None
+        )
 
         # Set up device info
         device_config = self._mqtt_config.get("device", {})
@@ -69,14 +73,17 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
 
         # If device has custom identifiers, use them
         if "identifiers" in device_config:
-            device_identifiers = {(DOMAIN, identifier) for identifier in device_config["identifiers"]}
+            device_identifiers = {
+                (DOMAIN, identifier) for identifier in device_config["identifiers"]
+            }
 
         self._attr_device_info = DeviceInfo(
             identifiers=device_identifiers,  # type: ignore
             name=config_entry.title,
             manufacturer=device_config.get("manufacturer", "MQTT Media Player"),
             model=device_config.get("model", "MQTT Media Player"),
-            sw_version=device_config.get("sw_version", "1.0.0"),
+            sw_version=device_config.get("sw_version", "2.0.0"),
+            configuration_url=device_config.get("configuration_url"),
         )
 
         _LOGGER.debug("Initialized MQTT Media Player: %s", self._attr_unique_id)
@@ -86,246 +93,347 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         """Return supported features based on available command topics."""
         features = MediaPlayerEntityFeature(0)
 
-        # Check command topics from config
-        if self._mqtt_config.get("play_topic"):
-            features |= MediaPlayerEntityFeature.PLAY
+        # Map feature flags from coordinator to MediaPlayerEntityFeature
+        feature_mapping = {
+            "supports_play": MediaPlayerEntityFeature.PLAY,
+            "supports_pause": MediaPlayerEntityFeature.PAUSE,
+            "supports_stop": MediaPlayerEntityFeature.STOP,
+            "supports_seek": MediaPlayerEntityFeature.SEEK,
+            "supports_volume_set": MediaPlayerEntityFeature.VOLUME_SET,
+            "supports_volume_step": MediaPlayerEntityFeature.VOLUME_STEP,
+            "supports_volume_mute": MediaPlayerEntityFeature.VOLUME_MUTE,
+            "supports_next_track": MediaPlayerEntityFeature.NEXT_TRACK,
+            "supports_previous_track": MediaPlayerEntityFeature.PREVIOUS_TRACK,
+            "supports_shuffle_set": MediaPlayerEntityFeature.SHUFFLE_SET,
+            "supports_repeat_set": MediaPlayerEntityFeature.REPEAT_SET,
+            "supports_turn_on": MediaPlayerEntityFeature.TURN_ON,
+            "supports_turn_off": MediaPlayerEntityFeature.TURN_OFF,
+            "supports_play_media": MediaPlayerEntityFeature.PLAY_MEDIA,
+            "supports_select_source": MediaPlayerEntityFeature.SELECT_SOURCE,
+            "supports_select_sound_mode": MediaPlayerEntityFeature.SELECT_SOUND_MODE,
+            "supports_clear_playlist": MediaPlayerEntityFeature.CLEAR_PLAYLIST,
+            "supports_browse_media": MediaPlayerEntityFeature.BROWSE_MEDIA,
+        }
 
-        if self._mqtt_config.get("pause_topic"):
-            features |= MediaPlayerEntityFeature.PAUSE
-
-        if self._mqtt_config.get("stop_topic"):
-            features |= MediaPlayerEntityFeature.STOP
-
-        if self._mqtt_config.get("volumeset_topic"):
-            features |= MediaPlayerEntityFeature.VOLUME_SET
-            features |= MediaPlayerEntityFeature.VOLUME_STEP
-
-        if self._mqtt_config.get("next_topic"):
-            features |= MediaPlayerEntityFeature.NEXT_TRACK
-
-        if self._mqtt_config.get("previous_topic"):
-            features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
-
-        if self._mqtt_config.get("playmedia_topic"):
-            features |= MediaPlayerEntityFeature.PLAY_MEDIA
-
-        if self._mqtt_config.get("seek_topic"):
-            features |= MediaPlayerEntityFeature.SEEK
-
-        if self._mqtt_config.get("browse_media_topic"):
-            features |= MediaPlayerEntityFeature.BROWSE_MEDIA
+        for feature_flag, feature_enum in feature_mapping.items():
+            if self.coordinator.supported_features.get(feature_flag, False):
+                features |= feature_enum
 
         _LOGGER.debug("Supported features for %s: %s", self._attr_unique_id, features)
         return features
 
     @property
-    def state(self) -> str | None:
+    def state(self) -> MediaPlayerState | None:
         """Return the state of the media player."""
         if self.coordinator.data.get("available") is False:
-            return "unavailable"
-        return self.coordinator.data.get("state")
+            return MediaPlayerState.OFF
+
+        state = self.coordinator.data.get("state")
+        if state in ["playing", "paused", "stopped", "idle", "off"]:
+            return MediaPlayerState(state)
+
+        return None
 
     @property
     def volume_level(self) -> float | None:
         """Return volume level of the media player (0..1)."""
-        return self.coordinator.data.get("volume")
+        return self.coordinator.data.get("volume_level")
 
     @property
-    def media_title(self) -> str | None:
-        """Return the title of current playing media."""
-        return self.coordinator.data.get("title")
+    def is_volume_muted(self) -> bool | None:
+        """Return whether the media player is muted."""
+        return self.coordinator.data.get("is_volume_muted")
 
     @property
-    def media_artist(self) -> str | None:
-        """Return the artist of current playing media."""
-        return self.coordinator.data.get("artist")
-
-    @property
-    def media_album_name(self) -> str | None:
-        """Return the album name of current playing media."""
-        return self.coordinator.data.get("album")
+    def media_content_id(self) -> str | None:
+        """Return the content ID of current playing media."""
+        # Use title as content ID if available
+        return self.coordinator.data.get("media_title")
 
     @property
     def media_content_type(self) -> str | None:
         """Return the content type of current playing media."""
-        return self.coordinator.data.get("mediatype", "music")
+        return self.coordinator.data.get("media_content_type", "music")
 
     @property
-    def media_position(self) -> int | None:
-        """Return the current position in seconds."""
-        return self.coordinator.data.get("position")
+    def media_title(self) -> str | None:
+        """Return the title of current playing media."""
+        return self.coordinator.data.get("media_title")
 
     @property
-    def media_position_updated_at(self) -> str | None:
-        """Return when the position was last updated."""
-        return getattr(self, '_attr_media_position_updated_at', None)
+    def media_artist(self) -> str | None:
+        """Return the artist of current playing media."""
+        return self.coordinator.data.get("media_artist")
+
+    @property
+    def media_album_name(self) -> str | None:
+        """Return the album name of current playing media."""
+        return self.coordinator.data.get("media_album_name")
+
+    @property
+    def media_album_artist(self) -> str | None:
+        """Return the album artist of current playing media."""
+        return self.coordinator.data.get("media_album_artist")
+
+    @property
+    def media_track(self) -> int | None:
+        """Return the track number of current playing media."""
+        return self.coordinator.data.get("media_track")
 
     @property
     def media_duration(self) -> int | None:
         """Return the duration of current playing media in seconds."""
-        return self.coordinator.data.get("duration")
+        return self.coordinator.data.get("media_duration")
+
+    @property
+    def media_position(self) -> int | None:
+        """Return the current position in seconds."""
+        return self.coordinator.data.get("media_position")
+
+    @property
+    def media_position_updated_at(self) -> str | None:
+        """Return when the position was last updated."""
+        return getattr(self, "_attr_media_position_updated_at", None)
 
     @property
     def media_image_url(self) -> str | None:
         """Return the image URL of current playing media."""
-        return self.coordinator.data.get("albumart_url")
+        return self.coordinator.data.get("media_image_url")
 
     @property
     def media_image_remotely_accessible(self) -> bool:
         """Return True if media image is accessible from outside the local network."""
-        # Base64 images are handled locally and don't need proxying
-        # URLs from local network (like local media servers) need proxying
-        if self.coordinator.data.get("albumart") is not None:
-            return True  # Base64 data is always accessible
-        return False  # URLs might not be accessible remotely, so proxy them
+        # For URLs, let Home Assistant handle proxying
+        image_url = self.coordinator.data.get("media_image_url")
+        if image_url and image_url.startswith(("http://", "https://")):
+            return False  # Let HA proxy it
+        return True  # Base64 or no image
 
     @property
     def media_image_hash(self) -> str | None:
         """Return a hash of the media image."""
-        albumart = self.coordinator.data.get("albumart")
-        albumart_url = self.coordinator.data.get("albumart_url")
-
-        if albumart:
-            hash_value = hashlib.md5(albumart).hexdigest()[:5]
-            _LOGGER.debug("Generated hash for base64 image: %s", hash_value)
-            return hash_value
-        elif albumart_url:
-            hash_value = hashlib.md5(albumart_url.encode()).hexdigest()[:5]
-            _LOGGER.debug("Generated hash for URL image: %s", hash_value)
-            return hash_value
-
+        image_url = self.coordinator.data.get("media_image_url")
+        if image_url:
+            return hashlib.md5(image_url.encode()).hexdigest()[:8]
         return None
+
+    @property
+    def media_episode(self) -> str | None:
+        """Return the episode of current playing media."""
+        return self.coordinator.data.get("media_episode")
+
+    @property
+    def media_season(self) -> str | None:
+        """Return the season of current playing media."""
+        return self.coordinator.data.get("media_season")
+
+    @property
+    def media_series_title(self) -> str | None:
+        """Return the series title of current playing media."""
+        return self.coordinator.data.get("media_series_title")
+
+    @property
+    def media_channel(self) -> str | None:
+        """Return the channel currently playing."""
+        return self.coordinator.data.get("media_channel")
+
+    @property
+    def media_playlist(self) -> str | None:
+        """Return the current playlist title."""
+        return self.coordinator.data.get("media_playlist")
+
+    @property
+    def app_id(self) -> str | None:
+        """Return the ID of the current running app."""
+        return self.coordinator.data.get("app_id")
+
+    @property
+    def app_name(self) -> str | None:
+        """Return the name of the current running app."""
+        return self.coordinator.data.get("app_name")
+
+    @property
+    def shuffle(self) -> bool | None:
+        """Return whether shuffle is enabled."""
+        return self.coordinator.data.get("shuffle")
+
+    @property
+    def repeat(self) -> RepeatMode | None:
+        """Return current repeat mode."""
+        repeat_mode = self.coordinator.data.get("repeat")
+        if repeat_mode == "off":
+            return RepeatMode.OFF
+        elif repeat_mode == "all":
+            return RepeatMode.ALL
+        elif repeat_mode == "one":
+            return RepeatMode.ONE
+        return None
+
+    @property
+    def source(self) -> str | None:
+        """Return the currently selected input source."""
+        return self.coordinator.data.get("source")
+
+    @property
+    def source_list(self) -> list[str] | None:
+        """Return list of available input sources."""
+        return self.coordinator.data.get("source_list")
+
+    @property
+    def sound_mode(self) -> str | None:
+        """Return the current sound mode."""
+        return self.coordinator.data.get("sound_mode")
+
+    @property
+    def sound_mode_list(self) -> list[str] | None:
+        """Return list of available sound modes."""
+        return self.coordinator.data.get("sound_mode_list")
+
+    @property
+    def group_members(self) -> list[str] | None:
+        """Return list of group member entity IDs."""
+        return self.coordinator.data.get("group_members")
 
     async def async_get_media_image(self) -> tuple[bytes | None, str | None]:
         """Fetch media image of current playing media."""
-        _LOGGER.debug("async_get_media_image called")
+        image_url = self.coordinator.data.get("media_image_url")
+        if not image_url:
+            return None, None
 
-        albumart = self.coordinator.data.get("albumart")
-        albumart_url = self.coordinator.data.get("albumart_url")
-
-        if albumart:
-            _LOGGER.debug("Returning base64 image data (%d bytes)", len(albumart))
-            return (albumart, "image/jpeg")
-        elif albumart_url:
-            # Use Home Assistant's built-in image fetching for URL-based images
-            _LOGGER.debug("Fetching image from URL: %s", albumart_url)
+        # Handle base64 encoded images
+        if image_url.startswith("data:image/"):
             try:
-                result = await async_fetch_image(_LOGGER, self.hass, albumart_url)
-                if result[0]:
-                    _LOGGER.debug("Successfully fetched image from URL (%d bytes, %s)", len(result[0]), result[1])
-                else:
-                    _LOGGER.debug("No image data returned from URL")
-                return result
-            except Exception as e:
-                _LOGGER.warning("Failed to fetch album art from URL %s: %s", albumart_url, e)
+                # Extract base64 data
+                header, data = image_url.split(",", 1)
+                import base64
 
-        _LOGGER.debug("No media image available")
+                image_data = base64.b64decode(data)
+
+                # Extract content type
+                content_type = header.split(";")[0].split(":")[-1]
+                return image_data, content_type
+            except Exception as e:
+                _LOGGER.warning("Failed to decode base64 image: %s", e)
+                return None, None
+
+        # Handle HTTP/HTTPS URLs
+        if image_url.startswith(("http://", "https://")):
+            try:
+                return await async_fetch_image(self.hass, image_url)
+            except Exception as e:
+                _LOGGER.warning("Failed to fetch image from URL %s: %s", image_url, e)
+                return None, None
+
         return None, None
 
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        _LOGGER.debug("Coordinator update received for %s", self._attr_unique_id)
+    # Command methods
+    async def async_turn_on(self) -> None:
+        """Turn the media player on."""
+        await self._publish_command("turn_on_topic", "ON")
 
-        # Update position timestamp if position changed
-        if self.coordinator.data.get("position") is not None:
-            self._attr_media_position_updated_at = utcnow()
+    async def async_turn_off(self) -> None:
+        """Turn the media player off."""
+        await self._publish_command("turn_off_topic", "OFF")
 
-        self.async_write_ha_state()
+    async def async_play_media(
+        self, media_type: str, media_id: str, **kwargs: Any
+    ) -> None:
+        """Play a piece of media."""
+        if media_source.is_media_source_id(media_id):
+            media_type = "url"
+            play_item = await media_source.async_resolve_media(
+                self.hass, media_id, self.entity_id
+            )
+            media_id = play_item.url
+
+        if media_type in ["url", "music", "video"]:
+            await self._publish_command("play_media_topic", media_id)
+        else:
+            _LOGGER.warning("Unsupported media type: %s", media_type)
 
     async def async_media_play(self) -> None:
-        """Send play command via MQTT."""
-        play_topic = self._mqtt_config.get("play_topic")
-        if not play_topic:
-            _LOGGER.warning("Play command not available - no play_topic configured")
-            return
-
-        play_payload = self._mqtt_config.get("play_payload", "Play")
-        await async_publish(self.hass, play_topic, play_payload)
+        """Send play command."""
+        await self._publish_command("play_topic", "Play")
 
     async def async_media_pause(self) -> None:
-        """Send pause command via MQTT."""
-        pause_topic = self._mqtt_config.get("pause_topic")
-        if not pause_topic:
-            _LOGGER.warning("Pause command not available - no pause_topic configured")
-            return
-
-        pause_payload = self._mqtt_config.get("pause_payload", "Pause")
-        await async_publish(self.hass, pause_topic, pause_payload)
+        """Send pause command."""
+        await self._publish_command("pause_topic", "Pause")
 
     async def async_media_stop(self) -> None:
-        """Send stop command via MQTT."""
-        stop_topic = self._mqtt_config.get("stop_topic")
-        if not stop_topic:
-            _LOGGER.warning("Stop command not available - no stop_topic configured")
-            return
-
-        stop_payload = self._mqtt_config.get("stop_payload", "Stop")
-        await async_publish(self.hass, stop_topic, stop_payload)
+        """Send stop command."""
+        await self._publish_command("stop_topic", "Stop")
 
     async def async_media_next_track(self) -> None:
-        """Send next track command via MQTT."""
-        next_topic = self._mqtt_config.get("next_topic")
-        if not next_topic:
-            _LOGGER.warning("Next track command not available - no next_topic configured")
-            return
-
-        next_payload = self._mqtt_config.get("next_payload", "Next")
-        await async_publish(self.hass, next_topic, next_payload)
+        """Send next track command."""
+        await self._publish_command("next_topic", "Next")
 
     async def async_media_previous_track(self) -> None:
-        """Send previous track command via MQTT."""
-        previous_topic = self._mqtt_config.get("previous_topic")
-        if not previous_topic:
-            _LOGGER.warning("Previous track command not available - no previous_topic configured")
-            return
+        """Send previous track command."""
+        await self._publish_command("previous_topic", "Previous")
 
-        previous_payload = self._mqtt_config.get("previous_payload", "Previous")
-        await async_publish(self.hass, previous_topic, previous_payload)
+    async def async_media_seek(self, position: float) -> None:
+        """Send seek command."""
+        await self._publish_command("seek_topic", str(int(position)))
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1."""
-        volumeset_topic = self._mqtt_config.get("volumeset_topic")
-        if not volumeset_topic:
-            _LOGGER.warning("Volume set command not available - no volumeset_topic configured")
-            return
+        await self._publish_command("volume_set_topic", str(volume))
 
-        await async_publish(self.hass, volumeset_topic, round(volume, 2))
+    async def async_mute_volume(self, mute: bool) -> None:
+        """Mute/unmute volume."""
+        payload = "ON" if mute else "OFF"
+        await self._publish_command("mute_topic", payload)
 
-    async def async_media_seek(self, position: int) -> None:
-        """Send seek command via MQTT."""
-        seek_topic = self._mqtt_config.get("seek_topic")
-        if not seek_topic:
-            _LOGGER.warning("Seek command not available - no seek_topic configured")
-            return
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        """Enable/disable shuffle mode."""
+        payload = "ON" if shuffle else "OFF"
+        await self._publish_command("shuffle_set_topic", payload)
 
-        await async_publish(self.hass, seek_topic, position)
-
-    async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
-        """Send play media command via MQTT."""
-        playmedia_topic = self._mqtt_config.get("playmedia_topic")
-        if not playmedia_topic:
-            _LOGGER.warning("Play media command not available - no playmedia_topic configured")
-            return
-
-        if media_source.is_media_source_id(media_id):
-            sourced_media = await media_source.async_resolve_media(self.hass, media_id)
-            media_type = sourced_media.mime_type
-            media_id = async_process_play_media_url(self.hass, sourced_media.url)
-
-        media_data = {
-            "media_type": media_type,
-            "media_id": media_id,
+    async def async_set_repeat(self, repeat: RepeatMode) -> None:
+        """Set repeat mode."""
+        repeat_map = {
+            RepeatMode.OFF: "off",
+            RepeatMode.ALL: "all",
+            RepeatMode.ONE: "one",
         }
-        await async_publish(self.hass, playmedia_topic, json.dumps(media_data))
+        payload = repeat_map.get(repeat, "off")
+        await self._publish_command("repeat_set_topic", payload)
 
-    async def async_browse_media(self, media_content_type: str, media_content_id: str) -> Any:
+    async def async_select_source(self, source: str) -> None:
+        """Select input source."""
+        await self._publish_command("select_source_topic", source)
+
+    async def async_select_sound_mode(self, sound_mode: str) -> None:
+        """Select sound mode."""
+        await self._publish_command("select_sound_mode_topic", sound_mode)
+
+    async def async_clear_playlist(self) -> None:
+        """Clear players playlist."""
+        await self._publish_command("clear_playlist_topic", "Clear")
+
+    async def async_browse_media(
+        self, media_content_type: str | None = None, media_content_id: str | None = None
+    ):
         """Implement the websocket media browsing helper."""
-        if not self._mqtt_config.get("browse_media_topic"):
-            _LOGGER.warning("Browse media not available - no browse_media_topic configured")
-            return None
+        # This would need to be implemented based on the device's browse capabilities
+        # For now, return None to indicate browsing is not supported
+        return None
 
-        return await media_source.async_browse_media(
-            self.hass,
-            media_content_id,
-            content_filter=lambda item: bool(item.media_content_type),
-        )
+    async def _publish_command(self, topic_key: str, payload: str) -> None:
+        """Publish a command to the device."""
+        topic = self._mqtt_config.get(topic_key)
+        if not topic:
+            _LOGGER.warning("Command topic %s not configured", topic_key)
+            return
+
+        _LOGGER.debug("Publishing command to %s: %s", topic, payload)
+        try:
+            await async_publish(
+                self.hass,
+                topic,
+                payload,
+                qos=0,
+                retain=False,
+            )
+        except Exception as e:
+            _LOGGER.error("Failed to publish command to %s: %s", topic, e)
