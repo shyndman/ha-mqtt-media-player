@@ -1,8 +1,3 @@
 {
-  "name": "MQTT Media Player",
-  "domain": "mqtt_media_player",
-  "documentation": "https://github.com/shyndman/ha-mqtt-media-player",
-  "issue_tracker": "https://github.com/shyndman/ha-mqtt-media-player/issues",
-  "codeowners": ["@shyndman"],
-  "version": "2.0.0"
+  "name": "MQTT Media Player"
 }

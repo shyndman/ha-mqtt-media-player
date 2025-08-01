@@ -1,10 +1,18 @@
 {
   "domain": "mqtt_media_player",
   "name": "MQTT Media Player",
+  "codeowners": [
+    "@shyndman"
+  ],
   "version": "2.0.0",
+  "documentation": "https://github.com/shyndman/ha-mqtt-media-player",
+  "issue_tracker": "https://github.com/shyndman/ha-mqtt-media-player/issues",
   "requirements": [],
   "config_flow": true,
-  "dependencies": ["mqtt"],
-  "codeowners": ["@shyndman"],
-  "mqtt": ["homeassistant/media_player/+/config"]
+  "dependencies": [
+    "mqtt"
+  ],
+  "mqtt": [
+    "homeassistant/media_player/+/config"
+  ]
 }
