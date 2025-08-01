@@ -1,9 +1,10 @@
 """MQTT Media Player integration."""
 
 import logging
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .coordinator import MQTTMediaPlayerCoordinator
@@ -13,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER]
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup(_hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration using YAML (if needed)."""
     _LOGGER.debug("async_setup called with config: %s", config)
     return True  # Allow UI-only configuration

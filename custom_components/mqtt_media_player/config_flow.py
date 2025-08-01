@@ -1,26 +1,26 @@
-"""Config flow for MQTT Media Player integration v2.0 - ha-mqtt-discoverable spec compliant."""
+"""Config flow for MQTT Media Player integration v2.0 - ha-mqtt-discoverable spec."""
 
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
-import voluptuous as vol
+from typing import Any
 
+import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
-from homeassistant.const import CONF_NAME
 from homeassistant.components.mqtt import async_subscribe
+from homeassistant.const import CONF_NAME
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
 )
-from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
-    DOMAIN,
     CONFIG_TOPIC_PATTERN,
     DISCOVERY_TOPIC,
+    DOMAIN,
     validate_configuration,
 )
 
@@ -34,7 +34,7 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the config flow."""
         self._discovered_devices = {}
         self._selected_device = None
@@ -55,8 +55,8 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 validated_config = validate_configuration(config_data)
                 _LOGGER.debug("Configuration validation successful for %s", device_name)
-            except vol.Invalid as e:
-                _LOGGER.error("Invalid configuration for device %s: %s", device_name, e)
+            except vol.Invalid:
+                _LOGGER.exception("Invalid configuration for device %s", device_name)
                 return self.async_abort(reason="invalid_discovery_config")
 
             # Create unique ID from device name or unique_id in config
@@ -75,15 +75,15 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             return await self.async_step_discovered_device()
 
-        except json.JSONDecodeError as e:
-            _LOGGER.error("Invalid JSON in discovery message: %s", e)
+        except json.JSONDecodeError:
+            _LOGGER.exception("Invalid JSON in discovery message")
             return self.async_abort(reason="invalid_discovery_json")
-        except Exception as e:
-            _LOGGER.error("Error processing MQTT discovery: %s", e)
+        except Exception:
+            _LOGGER.exception("Error processing MQTT discovery")
             return self.async_abort(reason="discovery_error")
 
     async def async_step_discovered_device(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: dict[str, Any] | None = None
     ):
         """Handle discovered device confirmation."""
         if user_input is not None:
@@ -104,15 +104,14 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({}),
         )
 
-    async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Handle the initial step."""
         errors = {}
 
         if user_input is not None:
             if user_input["setup_mode"] == "discover":
                 return await self.async_step_discovery()
-            else:
-                return await self.async_step_manual()
+            return await self.async_step_manual()
 
         return self.async_show_form(
             step_id="user",
@@ -135,7 +134,7 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_discovery(self, user_input: Optional[Dict[str, Any]] = None):
+    async def async_step_discovery(self, user_input: dict[str, Any] | None = None):
         """Handle device discovery."""
         if user_input is not None:
             if user_input["device"] == "manual":
@@ -213,7 +212,7 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )
 
-    async def async_step_manual(self, user_input: Optional[Dict[str, Any]] = None):
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None):
         """Handle manual device configuration."""
         errors = {}
 
@@ -237,8 +236,7 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             title=mqtt_config.get("name", device_name),
                             data={"mqtt_config": mqtt_config},
                         )
-                    else:
-                        errors[CONF_NAME] = "device_not_found"
+                    errors[CONF_NAME] = "device_not_found"
 
             except vol.Invalid as e:
                 _LOGGER.error("Invalid configuration for device %s: %s", device_name, e)
@@ -344,7 +342,7 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Unsubscribe
             subscription()
 
-    async def _fetch_mqtt_config(self, device_name: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_mqtt_config(self, device_name: str) -> dict[str, Any] | None:
         """Fetch MQTT config for a specific device."""
         _LOGGER.debug("Fetching MQTT config for: %s", device_name)
 
@@ -376,9 +374,8 @@ class MqttMediaPlayerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 validated_config = validate_configuration(received_config)
                 _LOGGER.debug("Configuration validation successful for %s", device_name)
                 return validated_config
-            else:
-                _LOGGER.warning("No config received for device: %s", device_name)
-                return None
+            _LOGGER.warning("No config received for device: %s", device_name)
+            return None
 
         except vol.Invalid as e:
             _LOGGER.error("Invalid configuration for device %s: %s", device_name, e)
@@ -404,7 +401,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Initialize options flow."""
         self.config_entry = config_entry
 
-    async def async_step_init(self, user_input: Optional[Dict[str, Any]] = None):
+    async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)

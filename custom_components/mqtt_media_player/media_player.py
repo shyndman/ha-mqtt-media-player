@@ -15,9 +15,9 @@ from homeassistant.components.media_player import (
 from homeassistant.components.mqtt import async_publish
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     DOMAIN,
@@ -78,7 +78,7 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
             }
 
         self._attr_device_info = DeviceInfo(
-            identifiers=device_identifiers,  # type: ignore
+            identifiers=device_identifiers,
             name=config_entry.title,
             manufacturer=device_config.get("manufacturer", "MQTT Media Player"),
             model=device_config.get("model", "MQTT Media Player"),
@@ -205,16 +205,14 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         """Return True if media image is accessible from outside the local network."""
         # For URLs, let Home Assistant handle proxying
         image_url = self.coordinator.data.get("media_image_url")
-        if image_url and image_url.startswith(("http://", "https://")):
-            return False  # Let HA proxy it
-        return True  # Base64 or no image
+        return not (image_url and image_url.startswith(("http://", "https://")))
 
     @property
     def media_image_hash(self) -> str | None:
         """Return a hash of the media image."""
         image_url = self.coordinator.data.get("media_image_url")
         if image_url:
-            return hashlib.md5(image_url.encode()).hexdigest()[:8]
+            return hashlib.md5(image_url.encode()).hexdigest()[:8]  # noqa: S324
         return None
 
     @property
@@ -263,9 +261,9 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         repeat_mode = self.coordinator.data.get("repeat")
         if repeat_mode == "off":
             return RepeatMode.OFF
-        elif repeat_mode == "all":
+        if repeat_mode == "all":
             return RepeatMode.ALL
-        elif repeat_mode == "one":
+        if repeat_mode == "one":
             return RepeatMode.ONE
         return None
 
@@ -305,23 +303,25 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
             try:
                 # Extract base64 data
                 header, data = image_url.split(",", 1)
-                import base64
+                import base64  # noqa: PLC0415
 
                 image_data = base64.b64decode(data)
 
                 # Extract content type
                 content_type = header.split(";")[0].split(":")[-1]
-                return image_data, content_type
-            except Exception as e:
-                _LOGGER.warning("Failed to decode base64 image: %s", e)
+
+            except Exception:
+                _LOGGER.exception("Failed to decode base64 image")
                 return None, None
+            else:
+                return image_data, content_type
 
         # Handle HTTP/HTTPS URLs
         if image_url.startswith(("http://", "https://")):
             try:
                 return await async_fetch_image(self.hass, image_url)
-            except Exception as e:
-                _LOGGER.warning("Failed to fetch image from URL %s: %s", image_url, e)
+            except Exception:
+                _LOGGER.exception("Failed to fetch image from URL %s", image_url)
                 return None, None
 
         return None, None
@@ -336,7 +336,7 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         await self._publish_command("turn_off_topic", "OFF")
 
     async def async_play_media(
-        self, media_type: str, media_id: str, **kwargs: Any
+        self, media_type: str, media_id: str, **_kwargs: Any
     ) -> None:
         """Play a piece of media."""
         if media_source.is_media_source_id(media_id):
@@ -379,12 +379,12 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         """Set volume level, range 0..1."""
         await self._publish_command("volume_set_topic", str(volume))
 
-    async def async_mute_volume(self, mute: bool) -> None:
+    async def async_mute_volume(self, mute: bool) -> None:  # noqa: FBT001
         """Mute/unmute volume."""
         payload = "ON" if mute else "OFF"
         await self._publish_command("mute_topic", payload)
 
-    async def async_set_shuffle(self, shuffle: bool) -> None:
+    async def async_set_shuffle(self, shuffle: bool) -> None:  # noqa: FBT001
         """Enable/disable shuffle mode."""
         payload = "ON" if shuffle else "OFF"
         await self._publish_command("shuffle_set_topic", payload)
@@ -412,12 +412,14 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         await self._publish_command("clear_playlist_topic", "Clear")
 
     async def async_browse_media(
-        self, media_content_type: str | None = None, media_content_id: str | None = None
-    ):
+        self,
+        media_content_type: str | None = None,  # noqa: ARG002
+        media_content_id: str | None = None,  # noqa: ARG002
+    ) -> None:
         """Implement the websocket media browsing helper."""
         # This would need to be implemented based on the device's browse capabilities
         # For now, return None to indicate browsing is not supported
-        return None
+        return
 
     async def _publish_command(self, topic_key: str, payload: str) -> None:
         """Publish a command to the device."""
@@ -435,5 +437,5 @@ class MQTTMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
                 qos=0,
                 retain=False,
             )
-        except Exception as e:
-            _LOGGER.error("Failed to publish command to %s: %s", topic, e)
+        except Exception:
+            _LOGGER.exception("Failed to publish command to %s", topic)

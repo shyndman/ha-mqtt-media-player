@@ -92,7 +92,7 @@ AVAILABILITY_SCHEMA = vol.Schema(
 )
 
 
-def _create_mqtt_config_schema():
+def _create_mqtt_config_schema() -> vol.Schema:
     """Create the MQTT configuration schema."""
     schema_dict = {
         # Core configuration

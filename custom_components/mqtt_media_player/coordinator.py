@@ -4,15 +4,15 @@ import json
 import logging
 import math
 
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.components.mqtt import async_subscribe
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     DOMAIN,
-    VALID_STATES,
     VALID_REPEAT_MODES,
+    VALID_STATES,
     get_supported_features,
 )
 
@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
     """Coordinate MQTT data for media player entities using v2.0 spec."""
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry):
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -85,7 +85,7 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
         """Fetch data from MQTT - not used since we're push-based."""
         return self.data
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Subscribe to MQTT topics when coordinator is added."""
         _LOGGER.debug("Setting up MQTT subscriptions")
 
@@ -131,7 +131,7 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
             "Successfully subscribed to %d MQTT topics", len(self._subscriptions)
         )
 
-    async def async_will_remove_from_hass(self):
+    async def async_will_remove_from_hass(self) -> None:
         """Clean up MQTT subscriptions."""
         _LOGGER.debug("Cleaning up MQTT subscriptions")
         for subscription in self._subscriptions:
@@ -140,7 +140,7 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
 
     # State handlers
     @callback
-    def _handle_state(self, message):
+    def _handle_state(self, message) -> None:
         """Handle state updates."""
         state = message.payload.strip()
         if state in VALID_STATES:
@@ -154,7 +154,7 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
         self.async_set_updated_data(self.data)
 
     @callback
-    def _handle_availability(self, message):
+    def _handle_availability(self, message) -> None:
         """Handle availability updates."""
         payload = message.payload.strip()
         availability_config = self.mqtt_config.get("availability", {})
@@ -167,7 +167,7 @@ class MQTTMediaPlayerCoordinator(DataUpdateCoordinator):
 
     # Media information handlers
     @callback
-    def _handle_media_title(self, message):
+    def _handle_media_title(self, message) -> None:
         """Handle media title updates."""
         title = message.payload.strip() or None
         _LOGGER.debug("Media title update: %s", title)
